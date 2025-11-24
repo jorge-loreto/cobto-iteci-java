@@ -1209,19 +1209,19 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         // TITLE CENTERED
         String titleText = "COMPROBANTE DE COLEGIATURA";
         content.beginText();
-        content.setFont(ubuntuBold, 24);
+        content.setFont(ubuntuBold, 18);
 
         float titleWidth = ubuntuBold.getStringWidth(titleText) / 1000 * 24;
         float titleX = (pageWidth - titleWidth) / 2f;
-        float titleY = pageHeight - margin - (logoHeight / 2) - 12;
+        float titleY = pageHeight - margin - (logoHeight / 2) +20;
 
         content.newLineAtOffset(titleX, titleY);
         content.showText(titleText);
         content.endText();
         //folio
         content.beginText();
-        content.setFont(ubuntuBold, 20);
-        content.newLineAtOffset((pageWidth - (margin))-120, titleY+30);
+        content.setFont(ubuntuBold, 18);
+        content.newLineAtOffset((pageWidth - (margin))-120, titleY);
         content.showText("FOLIO # " + dto.folio().toString());
         content.endText();
         //end folio
@@ -1229,8 +1229,8 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         titleY -= 24;
         content.beginText();
         content.setFont(ubuntu, 10);
-        content.newLineAtOffset(margin, titleY);
-        content.showText("Dirección: " + perfil.getDireccion() + ", " +
+        content.newLineAtOffset(titleX, titleY+10);
+        content.showText(perfil.getDireccion() + ", " +
                 perfil.getColonia() + ", " + formatLocation(perfil) +
                 ", Tel: " + formatTelefono(perfil.getTelefono()));
         content.endText();
@@ -1239,7 +1239,7 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         float yDesc = pageHeight - margin - logoHeight;
         content.beginText();
         content.setFont(ubuntuBold, 14);
-        content.newLineAtOffset(margin, yDesc);
+        content.newLineAtOffset(titleX, yDesc+40);
         content.showText(perfil.getNombrePerfil());
         content.newLineAtOffset(0, -18);
         content.setFont(ubuntu, 12);
