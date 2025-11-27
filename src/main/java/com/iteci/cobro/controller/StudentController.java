@@ -1,6 +1,8 @@
 package com.iteci.cobro.controller;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -9,9 +11,11 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.iteci.cobro.dto.AlumnoAsistenciaDTO;
 import com.iteci.cobro.dto.StudentDTO;
 import com.iteci.cobro.entities.Student;
-import com.iteci.cobro.repository.ListaAsistenciaRepository;
 import com.iteci.cobro.repository.StudentRepository;
 import com.iteci.cobro.services.PdfService;
 import com.iteci.cobro.services.ReciboServices;
@@ -75,6 +78,9 @@ public class StudentController {
                 //return ResponseEntity.noContent().build(); // 204 No Content
                 return ResponseEntity.ok(dtos);
             }
+            if(reciboServices.dateValidator()==false){
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Collections.emptyList());
+            }
             return ResponseEntity.ok(dtos);
         }catch(Exception e){
             e.printStackTrace(); // optional: replace with logger
@@ -84,64 +90,91 @@ public class StudentController {
     }
 
     @GetMapping("/recibo")
-public ResponseEntity<List<AlumnoAsistenciaDTO>> getRecibo(@RequestParam Long id) {
-    log.info("ID ALUMNO {} ", id);
+    public ResponseEntity<List<AlumnoAsistenciaDTO>> getRecibo(@RequestParam Long id) {
+        log.info("ID ALUMNO {} ", id);
 
-    try {
-        AlumnoAsistenciaDTO asistenciaOpt = reciboServices.getLatestAsistencia(id);
+        try {
+            AlumnoAsistenciaDTO asistenciaOpt = reciboServices.getLatestAsistencia(id);
 
-            log.info("--------------------- RECIBO ASISTENCIA ---------------------");
-            log.info("Asistencia: {}", asistenciaOpt);
-            return ResponseEntity.ok(List.of(asistenciaOpt));
+                log.info("--------------------- RECIBO ASISTENCIA ---------------------");
+                log.info("Asistencia: {}", asistenciaOpt);
+               
+                return ResponseEntity.ok(List.of(asistenciaOpt));
 
-    } catch (Exception e) {
-        log.error("Error fetching asistencia for alumno {}", id, e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                             .body(List.of()); // return empty list on error
+        } catch (Exception e) {
+            log.error("Error fetching asistencia for alumno {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(List.of()); // return empty list on error
+        }
     }
-}
 
-@PostMapping("/pagar")
-public ResponseEntity<String> pagar(@RequestBody AlumnoAsistenciaDTO dto) {
-    try {
-        // 1. Generate PDF
-        //File pdf = pdfService.generateReciboPDF(dto);
-        //File pdf = pdfService.generateReciboPDFBox(dto);
-        File pdf = pdfService.generateReciboPDFxyz99(dto);
-        // 2. Print PDF
-        //pdfService.printPDF(pdf);
+    @PostMapping("/pagar")
+    public ResponseEntity<String> pagar(@RequestBody AlumnoAsistenciaDTO dto) {
+        if(reciboServices.dateValidator()==false){
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Pago no permitido: Año límite alcanzado.");
+            
+        }else{
+            log.info("Processing payment for DTO: {}", dto);
+            try {
+                // 1. Generate PDF
+                log.info("Generating PDF for pago: {}", dto);
+                File pdf = pdfService.generateReciboPDFxyz99(dto);
+                // 2. Print PDF
+                log.info("Imprimiendo:", dto.folio());
+                pdfService.printPDF(pdf);
 
-        // 3. Update payment in database
-        int updatedRows = reciboServices.markAsPaid(dto);
+                // 3. Update payment in database
+                int updatedRows = reciboServices.markAsPaid(dto);
 
-        // ------------------------------
-        // SUCCESS CASE
-        // ------------------------------
-        if (updatedRows == 1) {
-            return ResponseEntity.ok("Pago procesado y recibo enviado a impresión.");
+                // ------------------------------
+                // SUCCESS CASE
+                // ------------------------------
+                if (updatedRows == 1) {
+                    return ResponseEntity.ok("Pago procesado y recibo enviado a impresión.");
+                }
+
+                // ------------------------------
+                // PROBLEM: No row updated
+                // ------------------------------
+                if (updatedRows == 0) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No se encontró el registro de asistencia para actualizar (idGrupoAlumno="
+                                + dto.idGrupoAlumno() + ", numeroSemana=" + dto.numeroSemana() + ").");
+                }
+
+                // ------------------------------
+                // PROBLEM: More than 1 row updated (should NEVER happen)
+                // ------------------------------
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body("Error: Se actualizaron múltiples registros. Verificar clave compuesta.");
+
+            }catch (Exception e) {
+                log.error("Error al procesar el pago o imprimir el recibo para alumno {}: {}", dto.idAlumno(), e.getMessage(), e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al procesar el pago o imprimir el recibo.");
+            }
+        }
+        
+    }
+    @GetMapping("/recibo/pdf/{folio}")
+    public ResponseEntity<byte[]> getReciboPDF(@PathVariable String folio) throws IOException {
+        log.info("pdf to be dowloaded: {} .pdf",folio);
+        String baseDir = System.getProperty("user.home") + "/recibos";
+        
+        File file = new File(baseDir + "/" + folio+ ".pdf");
+
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
         }
 
-        // ------------------------------
-        // PROBLEM: No row updated
-        // ------------------------------
-        if (updatedRows == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body("No se encontró el registro de asistencia para actualizar (idGrupoAlumno="
-                        + dto.idGrupoAlumno() + ", numeroSemana=" + dto.numeroSemana() + ").");
-        }
+        byte[] bytes = Files.readAllBytes(file.toPath());
 
-        // ------------------------------
-        // PROBLEM: More than 1 row updated (should NEVER happen)
-        // ------------------------------
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body("Error: Se actualizaron múltiples registros. Verificar clave compuesta.");
-
-    } catch (Exception e) {
-        log.error("Error al procesar el pago o imprimir el recibo para alumno {}: {}", dto.idAlumno(), e.getMessage(), e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body("Error al procesar el pago o imprimir el recibo.");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header("Content-Disposition", "attachment; filename=recibo.pdf")
+                .body(bytes);
     }
-}
 
 
 

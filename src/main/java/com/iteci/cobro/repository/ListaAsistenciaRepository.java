@@ -28,11 +28,10 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
     gru.diaSemana,
     gru.horaInicio,
     m.nombre,
-    ll_last.monto,
+    alm.colegiatura as monto,
     ll_last.numeroSemana + 1 AS numeroSemana,
     ll_folio.maxFolio+1 AS folio,
     ga.idGrupoAlumnos,
-    ll_last.fechaPago,
     gru.horaFin
     FROM iteci.alumnos a
     JOIN iteci.`grupo-alumnos` ga
@@ -41,11 +40,12 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
         ON gru.idGrupo = ga.idGrupo
     JOIN iteci.modalidades m
         ON gru.idModalidad = m.idModalidad
-
+    inner join iteci.`alumnos-modalidades` alm 
+        on alm.idAlumno = a.idAlumnos
     /* 🔥 FIX: get last semana + monto FOR THIS idGrupoAlumno ONLY */
     LEFT JOIN (
     
-            SELECT idGrupoAlumno, max(monto) as monto, MAX(numeroSemana) AS numeroSemana, max(fechaPago) as fechaPago
+            SELECT idGrupoAlumno, MAX(numeroSemana) AS numeroSemana
             FROM iteci.listaasistencia
             WHERE status LIKE 'P%' 
             GROUP BY idGrupoAlumno
@@ -84,6 +84,18 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
                       @Param("monto") Double monto,
                       @Param("status") String status,
                       @Param("folio") String folio);
+
+
+    
+
+                      @Query("""
+       SELECT COALESCE(MIN(l.id.numeroSemana), 1)
+       FROM ListaAsistencia l
+       WHERE l.id.idGrupoAlumno = :idGrupoAlumno
+       """)
+    Integer getLessNumeroSemana(@Param("idGrupoAlumno") Long idGrupoAlumno);
+
+
     
 }
 

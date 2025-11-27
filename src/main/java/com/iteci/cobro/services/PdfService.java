@@ -5,9 +5,16 @@ import java.awt.print.PageFormat;
 import java.awt.print.Paper;
 import java.awt.print.PrinterJob;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+
+import javax.print.attribute.HashPrintRequestAttributeSet;
+import javax.print.attribute.PrintRequestAttributeSet;
+import javax.print.attribute.standard.MediaPrintableArea;
+import javax.print.attribute.standard.PrintQuality;
+import javax.print.attribute.standard.PrinterResolution;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -18,6 +25,7 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
+import org.apache.pdfbox.printing.PDFPageable;
 import org.apache.pdfbox.printing.PDFPrintable;
 import org.apache.pdfbox.printing.Scaling;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -267,93 +275,165 @@ public class PdfService {
 
         document.close();
     }
+
     public void printPDF(File pdfFile) throws Exception {
-    PDDocument document = PDDocument.load(pdfFile);
+        try (PDDocument document = PDDocument.load(pdfFile)) {
 
-    PrinterJob job = PrinterJob.getPrinterJob();
-    job.setJobName("Recibo Pago");
+            PrinterJob job = PrinterJob.getPrinterJob();
+            job.setJobName("ReciboColegiatura");
 
-    // ✔ Prevent shrinking
-    PDFPrintable printable = new PDFPrintable(document, Scaling.ACTUAL_SIZE);
+            PDFPrintable printable = new PDFPrintable(
+                    document,
+                    Scaling.ACTUAL_SIZE,
+                    false,
+                    720        // HIGHER DPI = sharper print
+            );
 
-    Book book = new Book();
-    for (int i = 0; i < document.getNumberOfPages(); i++) {
-        book.append(printable, PageFormatFactory.createBorderlessPage(), 1);
+            double width  = 8.5 * 72;
+            double height = 11  * 72;
+
+            double margin = 0.15 * 72; // ≈ 3.8 mm
+
+            Paper paper = new Paper();
+            paper.setSize(width, height);
+            paper.setImageableArea(
+                    margin,
+                    margin,
+                    width  - (margin * 2),
+                    height - (margin * 2)
+            );
+
+            PageFormat pf = job.defaultPage();
+            pf.setPaper(paper);
+
+            job.setPrintable(printable, pf);
+
+            // ---- HIGH QUALITY PRINT ATTRIBUTES ----
+            PrintRequestAttributeSet attrs = new HashPrintRequestAttributeSet();
+            attrs.add(PrintQuality.HIGH);
+            attrs.add(new PrinterResolution(720, 720, PrinterResolution.DPI));
+            attrs.add(new MediaPrintableArea(
+                    (float)(margin / 72.0),
+                    (float)(margin / 72.0),
+                    (float)((width - margin*2) / 72.0),
+                    (float)((height - margin*2) / 72.0),
+                    MediaPrintableArea.INCH
+            ));
+
+            job.print(attrs);
+        }
     }
-    job.setPageable(book);
+    
+   public void printPDFxyz2(File pdfFile) throws Exception {
+        try (PDDocument document = PDDocument.load(pdfFile)) {
 
-    // Send to printer (no dialog)
-    job.print();
+            PrinterJob job = PrinterJob.getPrinterJob();
+            job.setJobName("ReciboColegiatura");
 
-    document.close();
-}
+            PDFPrintable printable = new PDFPrintable(
+                    document,
+                    Scaling.ACTUAL_SIZE,
+                    false,
+                    720
+            );
+
+            // LETTER SIZE in points (1" = 72 points)
+            double width  = 8.5 * 72;   // 612
+            double height = 11  * 72;   // 792
+
+            // --- Epson L310 real minimal margins ≈ 3.0 – 3.5 mm ---
+            double margin = 0.15 * 72; // 0.15 inch ≈ 3.8 mm (safe minimum)
+
+            Paper paper = new Paper();
+            paper.setSize(width, height);
+
+            // imageable area with minimal margins (NO artificial Java margins)
+            paper.setImageableArea(
+                    margin,              // left
+                    margin,              // top
+                    width  - (margin*2), // printable width
+                    height - (margin*2)  // printable height
+            );
+
+            PageFormat pf = job.defaultPage();
+            pf.setPaper(paper);
+
+            job.setPrintable(printable, pf);
+            job.print();
+        }
+    }
+
+
+
+    
+
 
 
 
     public File generateReciboPDF4(AlumnoAsistenciaDTO dto) throws IOException {
-    PDDocument document = new PDDocument();
+        PDDocument document = new PDDocument();
 
-    // Full LETTER page (required for Epson borderless)
-    PDPage page = new PDPage(PDRectangle.LETTER);
-    document.addPage(page);
+        // Full LETTER page (required for Epson borderless)
+        PDPage page = new PDPage(PDRectangle.LETTER);
+        document.addPage(page);
 
-    PDPageContentStream content = new PDPageContentStream(document, page);
+        PDPageContentStream content = new PDPageContentStream(document, page);
 
-    float margin = 18; // 0.25 in
-    float topY = 792 - margin; // LETTER height - margin
+        float margin = 18; // 0.25 in
+        float topY = 792 - margin; // LETTER height - margin
 
-    content.beginText();
-    content.setFont(PDType1Font.HELVETICA_BOLD, 18);
-    content.newLineAtOffset(margin, topY);
+        content.beginText();
+        content.setFont(PDType1Font.HELVETICA_BOLD, 18);
+        content.newLineAtOffset(margin, topY);
 
-    // Title
-    content.showText("RECIBO DE PAGO");
+        // Title
+        content.showText("RECIBO DE PAGO");
 
-    // Move down
-    content.setFont(PDType1Font.HELVETICA, 12);
-    content.newLineAtOffset(0, -40);
+        // Move down
+        content.setFont(PDType1Font.HELVETICA, 12);
+        content.newLineAtOffset(0, -40);
 
-    content.showText("Alumno: " + dto.nombre() + " " 
-            + dto.apellidoPaterno() + " " + dto.apellidoMaterno());
-    content.newLineAtOffset(0, -20);
+        content.showText("Alumno: " + dto.nombre() + " " 
+                + dto.apellidoPaterno() + " " + dto.apellidoMaterno());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Teléfono: " + dto.telefono());
-    content.newLineAtOffset(0, -20);
+        content.showText("Teléfono: " + dto.telefono());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Grupo: " + dto.idGrupo());
-    content.newLineAtOffset(0, -20);
+        content.showText("Grupo: " + dto.idGrupo());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Día Semana: " + dto.diaSemana());
-    content.newLineAtOffset(0, -20);
+        content.showText("Día Semana: " + dto.diaSemana());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Hora Inicio: " + dto.horaInicio());
-    content.newLineAtOffset(0, -20);
+        content.showText("Hora Inicio: " + dto.horaInicio());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Modalidad: " + dto.modalidad());
-    content.newLineAtOffset(0, -20);
+        content.showText("Modalidad: " + dto.modalidad());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Monto: $" + dto.monto());
-    content.newLineAtOffset(0, -20);
+        content.showText("Monto: $" + dto.monto());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Número Semana: " + dto.numeroSemana());
-    content.newLineAtOffset(0, -20);
+        content.showText("Número Semana: " + dto.numeroSemana());
+        content.newLineAtOffset(0, -20);
 
-    content.showText("Folio: " + dto.folio());
+        content.showText("Folio: " + dto.folio());
 
-    content.endText();
-    content.close();
+        content.endText();
+        content.close();
 
-    // Save file
-    String baseDir = System.getProperty("user.home") + "/recibos";
-    File dir = new File(baseDir);
-    if (!dir.exists()) dir.mkdirs();
+        // Save file
+        String baseDir = System.getProperty("user.home") + "/recibos";
+        File dir = new File(baseDir);
+        if (!dir.exists()) dir.mkdirs();
 
-    File file = new File(baseDir + "/recibo_" + dto.folio() + ".pdf");
-    document.save(file);
-    document.close();
+        File file = new File(baseDir + "/recibo_" + dto.folio() + ".pdf");
+        document.save(file);
+        document.close();
 
-    return file;
-}
+        return file;
+    }
 
 public File generateReciboPDF5(AlumnoAsistenciaDTO dto) throws IOException {
 
@@ -1185,8 +1265,15 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
     float pageHeight = PDRectangle.LETTER.getHeight();
     float margin = 18;
 
-    PDFont ubuntu = PDType0Font.load(document, new File("src/main/resources/fonts/Ubuntu-Regular.ttf"));
-    PDFont ubuntuBold = PDType0Font.load(document, new File("src/main/resources/fonts/Ubuntu-Bold.ttf"));
+    PDFont ubuntu;
+    try (InputStream regularFont = getClass().getResourceAsStream("/fonts/Ubuntu-Regular.ttf")) {
+        ubuntu = PDType0Font.load(document, regularFont);
+    }
+
+    PDFont ubuntuBold;
+    try (InputStream boldFont = getClass().getResourceAsStream("/fonts/Ubuntu-Bold.ttf")) {
+        ubuntuBold = PDType0Font.load(document, boldFont);
+    }
 
     PDPageContentStream content =
             new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, false);
@@ -1195,9 +1282,15 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
     float logoHeight = 0;
 
     try {
-        PDImageXObject logo = PDImageXObject.createFromFile(
-                getClass().getClassLoader().getResource("logo.png").getPath(),
-                document
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("logo.png");
+        if (logoStream == null) {
+            throw new FileNotFoundException("logo.png not found in resources");
+        }
+
+        PDImageXObject logo = PDImageXObject.createFromByteArray(
+                document,
+                logoStream.readAllBytes(),
+                "logo"
         );
 
         float scale = logoWidth / logo.getWidth();
@@ -1215,7 +1308,7 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         float titleX = (pageWidth - titleWidth) / 2f;
         float titleY = pageHeight - margin - (logoHeight / 2) +20;
 
-        content.newLineAtOffset(titleX, titleY);
+        content.newLineAtOffset(titleX+10, titleY);
         content.showText(titleText);
         content.endText();
         //folio
@@ -1228,8 +1321,8 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         // Address small line under title
         titleY -= 24;
         content.beginText();
-        content.setFont(ubuntu, 10);
-        content.newLineAtOffset(titleX, titleY+10);
+        content.setFont(ubuntu, 8);
+        content.newLineAtOffset(titleX+10, titleY+10);
         content.showText(perfil.getDireccion() + ", " +
                 perfil.getColonia() + ", " + formatLocation(perfil) +
                 ", Tel: " + formatTelefono(perfil.getTelefono()));
@@ -1239,7 +1332,7 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         float yDesc = pageHeight - margin - logoHeight;
         content.beginText();
         content.setFont(ubuntuBold, 14);
-        content.newLineAtOffset(titleX, yDesc+40);
+        content.newLineAtOffset(titleX+10, yDesc+40);
         content.showText(perfil.getNombrePerfil());
         content.newLineAtOffset(0, -18);
         content.setFont(ubuntu, 12);
@@ -1249,7 +1342,7 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         // TABLE
         float y = yDesc - 30;
         float tableX = margin;
-        float tableWidth = pageWidth * 0.75f;
+        float tableWidth = pageWidth * 0.5f;
         float tableY = y;
         float rowHeight = 24;
         float radius = 6;
@@ -1259,40 +1352,56 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
                 {"Curso", dto.modalidad()},
                 {"Horario", dto.diaSemana() + " " + dto.horaInicio() + " - " + dto.horaFinal()},
                 {"Fecha de pago", dto.fechaPago().toString()},
-                {"Total", "$" + dto.monto() + " " + "("+NumeroALetrasUtil.convertirMontoEnLetras(dto.monto())+")"},
+                {"Total", "$" + dto.monto()},
                 {"Concepto de pago", "Colegiatura semanal # " + dto.numeroSemana().toString()},
         };
-
+        int count = 1;
         for (String[] row : rows) {
             drawRoundedRect(content, tableX, tableY - rowHeight, tableWidth, rowHeight, radius);
             content.stroke();
 
+            // --- LABEL (Left column) ---
             content.beginText();
             content.setFont(ubuntuBold, 12);
             content.newLineAtOffset(tableX + 8, tableY - rowHeight + 7);
             content.showText(row[0] + ":");
             content.endText();
 
+            // --- VALUE (Right column) ---
             content.beginText();
             content.setFont(ubuntu, 12);
-            content.newLineAtOffset(tableX + 150, tableY - rowHeight + 7);
+            if(count<4){
+                count++;
+                content.newLineAtOffset(tableX + 60, tableY - rowHeight + 7);
+            }else
+                content.newLineAtOffset(tableX + 125, tableY - rowHeight + 7);
             content.showText(row[1]);
             content.endText();
+
+            // --- VALUE IN LETTERS (only for money rows) ---
+            if (row[1].startsWith("$")) {
+                content.beginText();
+                content.setFont(ubuntu, 8);
+                content.newLineAtOffset(tableX + 155, tableY - rowHeight + 7 ); // slightly lower
+                content.showText("(" + NumeroALetrasUtil.convertirMontoEnLetras(dto.monto()) + ")");
+                content.endText();
+            }
 
             tableY -= rowHeight + 4;
         }
 
+
         float boxWidth = 100;
         float boxHeight = 100;
         float boxX = pageWidth - boxWidth - margin;
-        float boxY = tableY - 40;
+        float boxY = tableY;
 
-        drawRoundedRect(content, boxX, boxY, boxWidth, boxHeight, 10);
+        drawRoundedRect(content, boxX-30, boxY, boxWidth, boxHeight, 10);
         content.stroke();
 
         content.beginText();
         content.setFont(ubuntu, 12);
-        content.newLineAtOffset(boxX + 20, boxY + boxHeight - 22);
+        content.newLineAtOffset(boxX-20, boxY + boxHeight - 22);
         content.showText("Firma y Sello");
         content.endText();
 
@@ -1302,7 +1411,7 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         File dir = new File(baseDir);
         if (!dir.exists()) dir.mkdirs();
 
-        File file = new File(baseDir + "/recibo_" + dto.folio() + ".pdf");
+        File file = new File(baseDir + "/" + dto.folio() + ".pdf");
         document.save(file);
         document.close();
         return file;

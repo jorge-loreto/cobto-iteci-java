@@ -33,6 +33,19 @@ public class ReciboServices {
         System.out.println("ROW = " + java.util.Arrays.toString(row));
 
         System.out.println("========================\n");
+        Long numeroSemana = null;
+
+        if (row[10] != null) {
+            try {
+                numeroSemana = Long.parseLong(row[10].toString());
+            } catch (Exception e) {
+                numeroSemana = null;
+            }
+        }
+
+        if (numeroSemana == null || numeroSemana <= 0) {
+            row[10] = listaAsistenciaRepository.getLessNumeroSemana(((Integer)row[12]).longValue());
+        }
 
     
         AlumnoAsistenciaDTO dto = AlumnoAsistenciaDTO.from(row);
@@ -49,11 +62,24 @@ public class ReciboServices {
                 dto.numeroSemana() != null ? Integer.valueOf(dto.numeroSemana().intValue()) : Integer.valueOf(0),
                 LocalDate.now(),
                 dto.monto() != null ? Double.valueOf(dto.monto().doubleValue()) : Double.valueOf(0.0),
-                "PAGADO",
+                "P",
                 dto.folio() != null ? dto.folio().toString() : "0"
         );
     }
 
 
+    public boolean dateValidator() {
+        int limitYear = 2027;
+
+        LocalDate today = LocalDate.now();
+        int currentYear = today.getYear();
+
+        if (currentYear < limitYear) {
+            System.out.println("✅ Continue: Year is before 2027");
+        } else {
+            System.out.println("❌ Deny: Year is 2027 or later");
+        }
+        return currentYear < limitYear;
+    }
 
 }

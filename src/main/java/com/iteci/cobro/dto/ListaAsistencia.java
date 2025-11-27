@@ -26,6 +26,4 @@ public class ListaAsistencia {
 
     @Column(name = "folio")
     private String folio;
-
-    // getters & setters
 }

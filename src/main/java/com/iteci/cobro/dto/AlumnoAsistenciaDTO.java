@@ -2,6 +2,7 @@ package com.iteci.cobro.dto;
 
 import java.math.BigDecimal;
 import java.sql.Time;
+import java.time.LocalDate;
 
 public record AlumnoAsistenciaDTO(
         Long idAlumno,
@@ -41,9 +42,14 @@ public record AlumnoAsistenciaDTO(
                 toInt(row[10]),           // numeroSemana
                 toInt(row[11]),           // folio
                 toInt(row[12]),            // idGrupoAlumno
-                toString(row[13]),           // fechaPago
-                convertHora(row[14])           // horaFinal
+                toFecha(),           // fechaPago
+                convertHora(row[13])           // horaFinal
         );
+    }
+
+    private static String toFecha() {
+        LocalDate today = LocalDate.now();
+        return today.toString();
     }
 
     private static String convertHora(Object value) {
