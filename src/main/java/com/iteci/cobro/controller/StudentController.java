@@ -26,6 +26,7 @@ import com.iteci.cobro.dto.AlumnoAsistenciaDTO;
 import com.iteci.cobro.dto.StudentDTO;
 import com.iteci.cobro.entities.Student;
 import com.iteci.cobro.repository.StudentRepository;
+import com.iteci.cobro.services.GcsStorageService;
 import com.iteci.cobro.services.PdfService;
 import com.iteci.cobro.services.ReciboServices;
 
@@ -38,32 +39,31 @@ import lombok.extern.slf4j.Slf4j;
 public class StudentController {
 
     @Autowired
-    private StudentRepository studentRepo;
-
-    @Autowired
     private ReciboServices reciboServices;
 
     @Autowired
     private PdfService pdfService;
 
+    @Autowired
+    private GcsStorageService gcsStorageService;
+
 
     @GetMapping("/test")
     public String testQuery() {
-        long count = studentRepo.count();
+        long count = reciboServices.countStudents();
         return "Students in database: " + count;
     }
 
-    @GetMapping("/telefono")
-    public Student getByEmail(@RequestParam String email) {
-        return studentRepo.findByEmail(email);
-    }
 
     @GetMapping("/nombre")
     public ResponseEntity<List<StudentDTO>> getStudents(@RequestParam String nombre) {
         log.info("nombre {} ",nombre);
 
         try{
-            List<Student> students = studentRepo.findAll();
+            List<Student> students = reciboServices.getEverybody();
+            log.info("--------------------- ALL STUDENTS ---------------------");
+            long count = reciboServices.countStudents();
+            log.info("Students in database: {}" ,count);
             log.info("--------------------- ALL STUDENTS ---------------------");
             students.forEach(s -> log.info("student {} ",s));
 
@@ -108,11 +108,11 @@ public class StudentController {
         }
     }
 
-    @PostMapping("/pagar")
+    @PostMapping("/registrar-pago")
     public ResponseEntity<String> pagar(@RequestBody AlumnoAsistenciaDTO dto) {
         if(reciboServices.dateValidator()==false){
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Pago no permitido: Año límite alcanzado.");
+                    .body("Pago no permitido: Año límite alcanzado. Se requiere actualización anual.");
             
         }else{
             log.info("Processing payment for DTO: {}", dto);
@@ -131,6 +131,7 @@ public class StudentController {
                 // SUCCESS CASE
                 // ------------------------------
                 if (updatedRows == 1) {
+                    gcsStorageService.uploadPdf(Files.readAllBytes(pdf.toPath()), dto.folio() + ".pdf");
                     return ResponseEntity.ok("Pago procesado y recibo enviado a impresión.");
                 }
 
@@ -155,7 +156,6 @@ public class StudentController {
                     .body("Error al procesar el pago o imprimir el recibo.");
             }
         }
-        
     }
     @GetMapping("/recibo/pdf/{folio}")
     public ResponseEntity<byte[]> getReciboPDF(@PathVariable String folio) throws IOException {
@@ -174,6 +174,27 @@ public class StudentController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header("Content-Disposition", "attachment; filename=recibo.pdf")
                 .body(bytes);
+    }
+
+    @PostMapping("/validar-pago-previo")
+    public ResponseEntity<String> pagarPrevio(@RequestBody AlumnoAsistenciaDTO dto) {
+            log.info("Validating payment for DTO: {}", dto);
+            try {
+                // Check for existing payment with same fechaPago and folio
+                boolean exists = reciboServices.folioValidator(dto.idGrupoAlumno().intValue());
+
+                if (exists) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body("ALERTA: Ya existe un pago con la misma fecha de este ALUMNO, ¿Esta adelantando o pagando semana atrasada??");
+                } else {
+                    return ResponseEntity.ok("No existe un pago previo con la misma fecha para este alumno.");
+                }
+
+            }catch (Exception e) {
+                log.error("Error al procesar el pago o imprimir el recibo para alumno {}: {}", dto.idAlumno(), e.getMessage(), e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al procesar el pago o imprimir el recibo.");
+            }
     }
 
 

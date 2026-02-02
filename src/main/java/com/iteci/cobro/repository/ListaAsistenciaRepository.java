@@ -32,7 +32,10 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
     ll_last.numeroSemana + 1 AS numeroSemana,
     ll_folio.maxFolio+1 AS folio,
     ga.idGrupoAlumnos,
-    gru.horaFin
+    gru.horaFin,
+    observaciones.totalObservaciones AS totalObservaciones,
+    COALESCE(semanas.adelantadas, 0 ) AS adelantadas,
+    semanasActual.semanaActual AS semanaActual
     FROM iteci.alumnos a
     JOIN iteci.`grupo-alumnos` ga
         ON a.idAlumnos = ga.idAlumno
@@ -40,31 +43,54 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
         ON gru.idGrupo = ga.idGrupo
     JOIN iteci.modalidades m
         ON gru.idModalidad = m.idModalidad
-    inner join iteci.`alumnos-modalidades` alm 
-        on alm.idAlumno = a.idAlumnos
-    /* 🔥 FIX: get last semana + monto FOR THIS idGrupoAlumno ONLY */
+    INNER JOIN iteci.`alumnos-modalidades` alm 
+        ON alm.idAlumno = a.idAlumnos
     LEFT JOIN (
-    
-            SELECT idGrupoAlumno, MAX(numeroSemana) AS numeroSemana
-            FROM iteci.listaasistencia
-            WHERE status LIKE 'P%' 
-            GROUP BY idGrupoAlumno
-    
-    ) ll_last
-    ON ll_last.idGrupoAlumno = ga.idGrupoAlumnos
-
+        SELECT idGrupoAlumno, MAX(numeroSemana) AS numeroSemana
+        FROM iteci.listaasistencia
+        WHERE status LIKE 'P%' 
+        GROUP BY idGrupoAlumno
+    ) ll_last ON ll_last.idGrupoAlumno = ga.idGrupoAlumnos
     LEFT JOIN (
         SELECT MAX(CAST(folio AS UNSIGNED)) AS maxFolio
         FROM iteci.listaasistencia
     ) ll_folio ON 1=1
+    LEFT JOIN (
+        SELECT 
+            idGrupoAlumno,
+            COUNT(*) - 1 AS totalObservaciones
+        FROM iteci.listaasistencia
+        WHERE fechaClase <= :fechaParametro
+          AND folio IS NULL
+        GROUP BY idGrupoAlumno
+    ) AS observaciones ON observaciones.idGrupoAlumno = ga.idGrupoAlumnos
+    LEFT JOIN (
+        SELECT 
+            idGrupoAlumno,
+            COUNT(*) AS adelantadas
+        FROM iteci.listaasistencia
+        WHERE fechaClase > :fechaParametro    -- fecha dinámica
+        AND folio IS NOT NULL
+        GROUP BY idGrupoAlumno
+    ) AS semanas
+    ON semanas.idGrupoAlumno = ga.idGrupoAlumnos
+    LEFT JOIN (
+        SELECT 
+            idGrupoAlumno,
+            max(numeroSemana) AS semanaActual
+        FROM iteci.listaasistencia
+        WHERE fechaClase <= :fechaParametro    -- fecha dinámica
+        GROUP BY idGrupoAlumno
+    ) AS semanasActual
+    ON semanasActual.idGrupoAlumno = ga.idGrupoAlumnos
+    WHERE a.idAlumnos = :idAlumno
+    LIMIT 1
+""", nativeQuery = true)
+List<Object[]> findLatestAsistenciaRaw(
+    @Param("idAlumno") Long idAlumno,
+    @Param("fechaParametro") java.time.LocalDate fechaParametro
+);
 
-    WHERE a.idAlumnos = ?
-    LIMIT 1;
-
-
-
-    """, nativeQuery = true)
-    List<Object[]> findLatestAsistenciaRaw(@Param("idAlumno") Long idAlumno);
 
 
 
@@ -88,7 +114,7 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
 
     
 
-                      @Query("""
+    @Query("""
        SELECT COALESCE(MIN(l.id.numeroSemana), 1)
        FROM ListaAsistencia l
        WHERE l.id.idGrupoAlumno = :idGrupoAlumno
@@ -96,6 +122,8 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
     Integer getLessNumeroSemana(@Param("idGrupoAlumno") Long idGrupoAlumno);
 
 
+    @Query("SELECT l FROM ListaAsistencia l WHERE l.fechaPago = :fechaPago")
+    List<ListaAsistencia> existingByFechaPago(java.time.LocalDate fechaPago);
     
 }
 

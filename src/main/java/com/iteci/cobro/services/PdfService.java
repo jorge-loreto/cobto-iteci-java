@@ -1,8 +1,11 @@
 package com.iteci.cobro.services;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.awt.print.Book;
 import java.awt.print.PageFormat;
 import java.awt.print.Paper;
+import java.awt.print.Printable;
 import java.awt.print.PrinterJob;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -28,6 +31,7 @@ import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.apache.pdfbox.printing.PDFPageable;
 import org.apache.pdfbox.printing.PDFPrintable;
 import org.apache.pdfbox.printing.Scaling;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -276,53 +280,49 @@ public class PdfService {
         document.close();
     }
 
-    public void printPDF(File pdfFile) throws Exception {
-        try (PDDocument document = PDDocument.load(pdfFile)) {
+   public void printPDF(File pdfFile) throws Exception {
+    try (PDDocument document = PDDocument.load(pdfFile)) {
 
-            PrinterJob job = PrinterJob.getPrinterJob();
-            job.setJobName("ReciboColegiatura");
+        PDFRenderer renderer = new PDFRenderer(document);
 
-            PDFPrintable printable = new PDFPrintable(
-                    document,
-                    Scaling.ACTUAL_SIZE,
-                    false,
-                    720        // HIGHER DPI = sharper print
+        PrinterJob job = PrinterJob.getPrinterJob();
+
+        job.setPrintable((graphics, pageFormat, pageIndex) -> {
+            if (pageIndex >= document.getNumberOfPages()) {
+                return Printable.NO_SUCH_PAGE;
+            }
+
+            Graphics2D g2d = (Graphics2D) graphics;
+
+            BufferedImage image;
+            try {
+                image = renderer.renderImageWithDPI(pageIndex, 300);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                return Printable.NO_SUCH_PAGE;
+            }
+
+            double xScale = pageFormat.getImageableWidth() / image.getWidth();
+            double yScale = pageFormat.getImageableHeight() / image.getHeight();
+            double scale = Math.min(xScale, yScale);
+
+            g2d.translate(
+                pageFormat.getImageableX(),
+                pageFormat.getImageableY()
             );
+            g2d.scale(scale, scale);
+            g2d.drawImage(image, 0, 0, null);
 
-            double width  = 8.5 * 72;
-            double height = 11  * 72;
+            return Printable.PAGE_EXISTS;
+        });
 
-            double margin = 0.15 * 72; // ≈ 3.8 mm
-
-            Paper paper = new Paper();
-            paper.setSize(width, height);
-            paper.setImageableArea(
-                    margin,
-                    margin,
-                    width  - (margin * 2),
-                    height - (margin * 2)
-            );
-
-            PageFormat pf = job.defaultPage();
-            pf.setPaper(paper);
-
-            job.setPrintable(printable, pf);
-
-            // ---- HIGH QUALITY PRINT ATTRIBUTES ----
-            PrintRequestAttributeSet attrs = new HashPrintRequestAttributeSet();
-            attrs.add(PrintQuality.HIGH);
-            attrs.add(new PrinterResolution(720, 720, PrinterResolution.DPI));
-            attrs.add(new MediaPrintableArea(
-                    (float)(margin / 72.0),
-                    (float)(margin / 72.0),
-                    (float)((width - margin*2) / 72.0),
-                    (float)((height - margin*2) / 72.0),
-                    MediaPrintableArea.INCH
-            ));
-
-            job.print(attrs);
-        }
+        job.print();
     }
+}
+
+
+
     
    public void printPDFxyz2(File pdfFile) throws Exception {
         try (PDDocument document = PDDocument.load(pdfFile)) {
@@ -1313,9 +1313,9 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
         content.endText();
         //folio
         content.beginText();
-        content.setFont(ubuntuBold, 18);
-        content.newLineAtOffset((pageWidth - (margin))-120, titleY);
-        content.showText("FOLIO # " + dto.folio().toString());
+        content.setFont(ubuntuBold, 15);
+        content.newLineAtOffset((pageWidth - (margin))-180, titleY);
+        content.showText(" : FOLIO # " + dto.folio().toString());
         content.endText();
         //end folio
         // Address small line under title
@@ -1328,24 +1328,31 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
                 ", Tel: " + formatTelefono(perfil.getTelefono()));
         content.endText();
 
-        // SCHOOL DESCRIPTION
-        float yDesc = pageHeight - margin - logoHeight;
-        content.beginText();
-        content.setFont(ubuntuBold, 14);
-        content.newLineAtOffset(titleX+10, yDesc+40);
-        content.showText(perfil.getNombrePerfil());
-        content.newLineAtOffset(0, -18);
-        content.setFont(ubuntu, 12);
-        content.showText("Campus: " + perfil.getLocalidad());
-        content.endText();
+// SCHOOL DESCRIPTION
+float schoolStartY = pageHeight - margin - logoHeight + 40;
 
-        // TABLE
-        float y = yDesc - 30;
-        float tableX = margin;
-        float tableWidth = pageWidth * 0.5f;
-        float tableY = y;
-        float rowHeight = 24;
-        float radius = 6;
+content.beginText();
+content.setFont(ubuntuBold, 14);
+content.newLineAtOffset(titleX + 10, schoolStartY);
+content.showText(perfil.getNombrePerfil());
+
+content.newLineAtOffset(0, -18);
+content.setFont(ubuntu, 12);
+content.showText("Campus: " + perfil.getLocalidad());
+content.endText();
+        // ===========================
+        // 4) MAIN CONTENT TABLE
+        // ===========================
+        
+
+// TABLE (just below Campus)
+float tableStartY = schoolStartY - 30;
+float tableX = margin;
+float tableWidth = pageWidth * 0.5f;
+float tableY = tableStartY;
+float rowHeight = 24;
+float radius = 6;
+
 
         String[][] rows = {
                 {"Alumno", dto.nombre() + " " + dto.apellidoPaterno() + " " + dto.apellidoMaterno()},
@@ -1354,6 +1361,8 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
                 {"Fecha de pago", dto.fechaPago().toString()},
                 {"Total", "$" + dto.monto()},
                 {"Concepto de pago", "Colegiatura semanal # " + dto.numeroSemana().toString()},
+                {"Observaciones", dto.observaciones()},
+                {"Semana actual ", "#"+dto.semanaActual().toString()}
         };
         int count = 1;
         for (String[] row : rows) {
@@ -1389,7 +1398,6 @@ public File generateReciboPDFxyz99(AlumnoAsistenciaDTO dto) throws IOException {
 
             tableY -= rowHeight + 4;
         }
-
 
         float boxWidth = 100;
         float boxHeight = 100;

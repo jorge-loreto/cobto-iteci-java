@@ -19,7 +19,11 @@ public record AlumnoAsistenciaDTO(
         Integer folio,
         Integer idGrupoAlumno,
         String fechaPago,
-        String horaFinal
+        String horaFinal,
+        Integer totalObservaciones,
+        Integer semanasAdelantadas,
+        String observaciones,
+        Integer semanaActual
 ) {
 
     // Factory method from raw Object[]
@@ -43,8 +47,26 @@ public record AlumnoAsistenciaDTO(
                 toInt(row[11]),           // folio
                 toInt(row[12]),            // idGrupoAlumno
                 toFecha(),           // fechaPago
-                convertHora(row[13])           // horaFinal
+                convertHora(row[13]),           // horaFinal
+                toInt(row[14]),            // totalObservaciones
+                toInt(row[15]),  //semanas adelantadas
+                toObserv(toInt(row[14]), toInt(row[15])),         // observaciones
+                toInt(row[16])  // semanaActual
+
         );
+    }
+
+    private static String toObserv(int totalSemanasPendientes, int numeroSemanaAdelantadas) {
+        
+        if (totalSemanasPendientes < 0 && numeroSemanaAdelantadas==0) {
+            return "1 semana adelantada de pago";
+            
+        } else if (totalSemanasPendientes < 0 && numeroSemanaAdelantadas>0) {
+            return numeroSemanaAdelantadas+1+" semanas adelantadas de pago";
+            
+        } else {
+            return totalSemanasPendientes + " semanas pendientes de pago.";
+        }
     }
 
     private static String toFecha() {
