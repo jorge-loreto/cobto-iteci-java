@@ -12,6 +12,11 @@ target/
 .settings
 .springBeans
 .sts4-cache
+.env*
+application-*.properties
+*.json
+Dockerfile
+
 
 ### IntelliJ IDEA ###
 .idea
