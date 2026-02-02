@@ -12,11 +12,6 @@ target/
 .settings
 .springBeans
 .sts4-cache
-.env*
-application-*.properties
-*.json
-Dockerfile
-
 
 ### IntelliJ IDEA ###
 .idea
@@ -36,3 +31,12 @@ build/
 
 ### VS Code ###
 .vscode/
+# Environment files
+.env*
+application-*.properties
+
+# Secrets / credentials
+*.json
+
+# Docker (optional)
+Dockerfile
