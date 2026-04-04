@@ -23,7 +23,9 @@ public record AlumnoAsistenciaDTO(
         Integer totalObservaciones,
         Integer semanasAdelantadas,
         String observaciones,
-        Integer semanaActual
+        Integer semanaActual,
+        BigDecimal montoModificado,
+        Boolean montoEditado
 ) {
 
     // Factory method from raw Object[]
@@ -51,9 +53,15 @@ public record AlumnoAsistenciaDTO(
                 toInt(row[14]),            // totalObservaciones
                 toInt(row[15]),  //semanas adelantadas
                 toObserv(toInt(row[14]), toInt(row[15])),         // observaciones
-                toInt(row[16])  // semanaActual
+                toInt(row[16]),  // semanaActual
+                toBigDecimal(row[9]),  // montoModificado
+                toBoolean(false)  // montoEditado
 
         );
+    }
+
+    private static Boolean toBoolean(boolean b) {
+        return Boolean.valueOf(b);
     }
 
     private static String toObserv(int totalSemanasPendientes, int numeroSemanaAdelantadas) {
@@ -124,5 +132,30 @@ public record AlumnoAsistenciaDTO(
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Cannot convert to BigDecimal: " + o, e);
         }
+    }
+    public String toStringFull() {
+        return "AlumnoAsistenciaDTO{" +
+                "idAlumno=" + idAlumno +
+                ", nombre='" + nombre + '\'' +
+                ", apellidoPaterno='" + apellidoPaterno + '\'' +
+                ", apellidoMaterno='" + apellidoMaterno + '\'' +
+                ", telefono='" + telefono + '\'' +
+                ", idGrupo=" + idGrupo +
+                ", diaSemana='" + diaSemana + '\'' +
+                ", horaInicio='" + horaInicio + '\'' +
+                ", modalidad='" + modalidad + '\'' +
+                ", monto=" + monto +
+                ", numeroSemana=" + numeroSemana +
+                ", folio=" + folio +
+                ", idGrupoAlumno=" + idGrupoAlumno +
+                ", fechaPago='" + fechaPago + '\'' +
+                ", horaFinal='" + horaFinal + '\'' +
+                ", totalObservaciones=" + totalObservaciones +
+                ", semanasAdelantadas=" + semanasAdelantadas +
+                ", observaciones='" + observaciones + '\'' +
+                ", semanaActual=" + semanaActual +
+                ", montoModificado=" + montoModificado +
+                ", montoEditado=" + montoEditado +
+                '}';
     }
 }
