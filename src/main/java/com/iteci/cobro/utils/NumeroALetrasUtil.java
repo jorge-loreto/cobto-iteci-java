@@ -1,6 +1,7 @@
 package com.iteci.cobro.utils;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 
 public class NumeroALetrasUtil {
 
@@ -70,5 +71,22 @@ public class NumeroALetrasUtil {
                 return "un millón" + (r > 0 ? " " + convertirNumero(r) : "");
             return convertirNumero(millones) + " millones" + (r > 0 ? " " + convertirNumero(r) : "");
         }
+    }
+
+    public static String changeWordString(String name){
+        if (name == null || name.length() == 0) return "X";
+         // 1. Remove accents first
+        name = Normalizer.normalize(name, Normalizer.Form.NFD);
+        name = name.replaceAll("\\p{M}", ""); // removes diacritical marks
+
+        String[] parts = name.trim().split("\\s+"); // handles multiple spaces safely
+        String resultaString = "";
+        for(String names : parts){
+            resultaString += names.toUpperCase().charAt(0) 
+                + names.substring(1).toLowerCase() 
+                + " ";
+        }
+        resultaString = resultaString.trim();
+        return resultaString;
     }
 }

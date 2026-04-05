@@ -34,16 +34,21 @@ import org.apache.pdfbox.printing.PDFPageable;
 import org.apache.pdfbox.printing.PDFPrintable;
 import org.apache.pdfbox.printing.Scaling;
 import org.apache.pdfbox.rendering.PDFRenderer;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.iteci.cobro.dto.AlumnoAsistenciaDTO;
 import com.iteci.cobro.utils.NumeroALetrasUtil;
+
+import lombok.extern.slf4j.Slf4j;
+
 import com.iteci.cobro.entities.Perfil;
 import com.iteci.cobro.exceptions.IteciPrinterException;
 import com.iteci.cobro.repository.ListaAsistenciaRepository;
 import com.iteci.cobro.repository.PerfilRepository;
 
+@Slf4j
 @Service
 public class PdfService {
 
@@ -328,15 +333,19 @@ public class PdfService {
             job.print();
 
         }catch (FileNotFoundException e) {
+            log.error("PDF file not found: " + pdfFile.getAbsolutePath(), e);
             throw new IteciPrinterException("PDF file not found: " + pdfFile.getAbsolutePath(), e);
 
         }catch (IOException e) {
+            log.error("Error loading PDF: " + e.getMessage(), e);
             throw new IteciPrinterException("Error loading PDF", e);
 
         }catch (PrinterException e) {
+            log.error("Error printing PDF: " + e.getMessage(), e);
             throw new IteciPrinterException("Error printing PDF", e);
 
         }catch (Exception e) {
+            log.error("Unexpected error while printing: " + e.getMessage(), e);
             throw new IteciPrinterException("Unexpected error while printing", e);
         }
     }
@@ -1359,12 +1368,13 @@ public class PdfService {
             content.setNonStrokingColor(255, 100, 100); // red color for folio
                         
             content.newLineAtOffset((pageWidth - (margin)) - 180, titleY);
-            content.showText(" : FOLIO # " + dto.folio().toString());
+            content.showText(" FOLIO # " + dto.folio().toString());
             content.endText();
             // end folio
             // Address small line under title
             titleY -= 24;
             content.beginText();
+            content.setNonStrokingColor(0, 0, 0); // black color for address
             content.setFont(ubuntu, 8);
             content.newLineAtOffset(titleX + 10, titleY + 10);
             content.showText(perfil.getDireccion() + ", " +
@@ -1376,13 +1386,15 @@ public class PdfService {
             float schoolStartY = pageHeight - margin - logoHeight + 40;
 
             content.beginText();
+            content.setNonStrokingColor(0, 0, 255); // blue color for title
             content.setFont(ubuntuBold, 14);
             content.newLineAtOffset(titleX + 10, schoolStartY);
             content.showText(perfil.getNombrePerfil());
-
+            content.setNonStrokingColor(0, 0, 0); // black color for rest of document
             content.newLineAtOffset(0, -18);
             content.setFont(ubuntu, 12);
             content.showText("Campus: " + perfil.getLocalidad());
+            
             content.endText();
             // ===========================
             // 4) MAIN CONTENT TABLE
@@ -1395,9 +1407,9 @@ public class PdfService {
             float tableY = tableStartY;
             float rowHeight = 24;
             float radius = 6;
-
+            String fullName = NumeroALetrasUtil.changeWordString(dto.nombre()) + " " + NumeroALetrasUtil.changeWordString(dto.apellidoPaterno()) + " " + NumeroALetrasUtil.changeWordString(dto.apellidoMaterno());
             String[][] rows = {
-                    { "Alumno", dto.nombre() + " " + dto.apellidoPaterno() + " " + dto.apellidoMaterno() },
+                    { "Alumno", fullName },
                     { "Curso", dto.modalidad() },
                     { "Horario", dto.diaSemana() + " " + dto.horaInicio() + " - " + dto.horaFinal() },
                     { "Fecha de pago", dto.fechaPago().toString() },

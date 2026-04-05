@@ -6,6 +6,7 @@ import com.iteci.cobro.dto.ListaAsistenciaId;
 import com.iteci.cobro.entities.Student;
 import com.iteci.cobro.repository.ListaAsistenciaRepository;
 import com.iteci.cobro.repository.StudentRepository;
+import com.iteci.cobro.utils.NumeroALetrasUtil;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -49,7 +50,7 @@ public class ReciboServices {
         LocalDate today = LocalDate.now();
         
         //List<Object[]> raw = listaService.getLatestAsistencia(idAlumno, today);
-        List<Object[]> raw = listaService.getLatestAsistencia2(idAlumno, today);
+        List<Object[]> raw = listaService.getLatestAsistencia3(idAlumno, today);
 
         if (raw.isEmpty()) return null;
 
@@ -144,36 +145,22 @@ public class ReciboServices {
 
         List<Student> filteredStudents = students.stream()
                 .map(stu ->{
-                    stu.setNombre(changeWordString(stu.getNombre()));
-                    stu.setApellidoPaterno(changeWordString(stu.getApellidoPaterno()));
-                    stu.setApellidoMaterno(changeWordString(stu.getApellidoMaterno()));
+                    stu.setNombre(NumeroALetrasUtil.changeWordString(stu.getNombre()));
+                    stu.setApellidoPaterno(NumeroALetrasUtil.changeWordString(stu.getApellidoPaterno()));
+                    stu.setApellidoMaterno(NumeroALetrasUtil.changeWordString(stu.getApellidoMaterno()));
                     return stu;
                 })
                 .toList();
         return filteredStudents;
     }
 
-    public String changeWordString(String name){
-         // 1. Remove accents first
-        name = Normalizer.normalize(name, Normalizer.Form.NFD);
-        name = name.replaceAll("\\p{M}", ""); // removes diacritical marks
-
-        String[] parts = name.trim().split("\\s+"); // handles multiple spaces safely
-        String resultaString = "";
-        for(String names : parts){
-            resultaString += names.toUpperCase().charAt(0) 
-                + names.substring(1).toLowerCase() 
-                + " ";
-        }
-        resultaString = resultaString.trim();
-        return resultaString;
-    }
 
     public int countStudents(){
         return (int) studentRepo.count();
     }
     @Transactional
-    public int markAsPaidModified(long idGrupoAlumno, int numeroSemana, double monto, String folio, String status) {
+    public int markAsPaidModified(long idGrupoAlumno, int numeroSemana, 
+        double monto, String folio, String status) {
         return listaAsistenciaRepository.updatePayment(
                 idGrupoAlumno,
                 numeroSemana,

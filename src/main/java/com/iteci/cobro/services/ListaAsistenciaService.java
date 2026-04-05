@@ -12,6 +12,7 @@ import jakarta.persistence.StoredProcedureQuery;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,20 +57,7 @@ public class ListaAsistenciaService {
         return listaAsistencia;
     }
 
-    public List<Object[]>  getLatestAsistencia(Long idAlumno, LocalDate fechaParametro) {
-        StoredProcedureQuery query = entityManager.createStoredProcedureQuery("get_latest_asistencia");
-        query.registerStoredProcedureParameter("p_idAlumno", Long.class, ParameterMode.IN);
-        query.registerStoredProcedureParameter("p_fechaParametro", LocalDate.class, ParameterMode.IN);
-        query.setParameter("p_idAlumno", idAlumno);
-        query.setParameter("p_fechaParametro", fechaParametro);
-
-        List<Object[]> results = query.getResultList();
-
-       
-        return results;
-    }
-
-    public List<Object[]>  getLatestAsistencia2(Long idAlumno, LocalDate fechaParametro) {
+    public List<Object[]>  getLatestAsistencia3(Long idAlumno, LocalDate fechaParametro) {
         List<Object[]> results = listaAsistenciaRepository.findLatestAsistenciaRaw(idAlumno, fechaParametro);
        
         return results;

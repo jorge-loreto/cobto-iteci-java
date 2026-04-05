@@ -110,7 +110,7 @@ public class StudentController {
     }
 
     @PostMapping("/registrar-pago")
-    public ResponseEntity<String> pagar(@RequestBody AlumnoAsistenciaDTO dto) throws IOException {
+    public ResponseEntity<String> pagar(@RequestBody AlumnoAsistenciaDTO dto) throws IOException, IteciPrinterException {
         System.out.println("update payment for: " + dto);
         if (reciboServices.dateValidator() == false) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

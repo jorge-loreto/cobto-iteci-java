@@ -3,7 +3,6 @@ package com.iteci.cobro.repository;
 import com.iteci.cobro.dto.ListaAsistencia;
 import com.iteci.cobro.dto.ListaAsistenciaId;
 
-import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.QueryHint;
 
 import org.springframework.data.jpa.repository.Query;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.time.LocalDate;
 
-import org.hibernate.annotations.Cache;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -24,68 +22,45 @@ public interface ListaAsistenciaRepository extends JpaRepository<ListaAsistencia
 
     @Transactional
     @CacheEvict(value = {"entityCache", "queryCache"}, allEntries = true)
-    @Query(value = """
-    SELECT
-        a.idAlumnos,
-        a.nombre,
-        a.apellidoPaterno,
-        a.apellidoMaterno,
-        a.telefono,
-        ga.idGrupo,
-        gru.diaSemana,
-        gru.horaInicio,
-        m.nombre AS modalidad,
-        alm.colegiatura AS monto,
-
-        COALESCE(
-            (SELECT MIN(la.numeroSemana + 1)
-             FROM iteci.listaasistencia la
-             WHERE la.idGrupoAlumno = ga.idGrupoAlumnos
-             AND la.status='P'), 1
-        ) AS numeroSemanaSiguiente,
-
-        COALESCE(
-            (SELECT MAX(CAST(folio AS UNSIGNED)) + 1
-             FROM iteci.listaasistencia),
-            1
-        ) AS folio,
-
-        ga.idGrupoAlumnos,
-        gru.horaFin,
-
-        COALESCE(
-            (SELECT COUNT(*)
-             FROM iteci.listaasistencia la
-             WHERE la.idGrupoAlumno = ga.idGrupoAlumnos
-             AND la.fechaClase <= :fechaParametro
-             AND la.folio IS NULL), 0
-        ) AS totalObservaciones,
-
-        COALESCE(
-            (SELECT COUNT(*)
-             FROM iteci.listaasistencia la
-             WHERE la.idGrupoAlumno = ga.idGrupoAlumnos
-             AND la.fechaClase > :fechaParametro
-             AND la.folio IS NOT NULL), 0
-        ) AS adelantadas,
-
-        COALESCE(
-            (SELECT MAX(la.numeroSemana)
-             FROM iteci.listaasistencia la
-             WHERE la.idGrupoAlumno = ga.idGrupoAlumnos
-             AND la.fechaClase <= :fechaParametro), 0
-        ) AS semanaActualPago
-
-    FROM iteci.alumnos a
-    JOIN iteci.`grupo-alumnos` ga ON a.idAlumnos = ga.idAlumno
-    JOIN iteci.grupos gru ON gru.idGrupo = ga.idGrupo
-    JOIN iteci.modalidades m ON gru.idModalidad = m.idModalidad
-    JOIN iteci.`alumnos-modalidades` alm ON alm.idAlumno = a.idAlumnos
-
-    WHERE a.idAlumnos = :idAlumno
-    LIMIT 1
-    """, nativeQuery = true)
-
+    @Query(value = "SELECT\n" + //
+                "    al.idAlumnos,\n" + //
+                "    al.nombre,\n" + //
+                "    al.apellidoPaterno,\n" + //
+                "    al.apellidoMaterno,\n" + //
+                "    al.telefono,\n" + //
+                "    ga.idGrupo,\n" + //
+                "    gru.diaSemana,\n" + //
+                "    gru.horaInicio,\n" + //
+                "    m.nombre AS modalidad,\n" + //
+                "    alm.colegiatura AS monto,\n" + //
+                "    COALESCE(MAX(CASE WHEN la.status = 'P' THEN la.numeroSemana ELSE NULL END), 0) + 1 AS numeroSemanaSiguiente,\n" + //
+                "    (SELECT COALESCE(MAX(CAST(folio AS UNSIGNED)) + 1, 1) FROM iteci.listaasistencia) AS folio,\n" + //
+                "    ga.idGrupoAlumnos,\n" + //
+                "    gru.horaFin,\n" + //
+                "    SUM(CASE WHEN la.fechaClase < :fechaParametro AND la.folio IS NULL THEN 1 ELSE 0 END) -1 AS totalObservaciones,\n" + //
+                "    SUM(CASE WHEN la.fechaClase > :fechaParametro AND la.folio IS NOT NULL THEN 1 ELSE 0 END) AS adelantadas,\n" + //
+                "    COALESCE(MAX(CASE WHEN la.fechaClase <= :fechaParametro THEN la.numeroSemana ELSE NULL END), 1)  AS semanaActualPago\n" + //
+                "FROM iteci.alumnos AS al\n" + //
+                "JOIN iteci.`grupo-alumnos` AS ga ON al.idAlumnos = ga.idAlumno\n" + //
+                "JOIN iteci.grupos AS gru ON gru.idGrupo = ga.idGrupo\n" + //
+                "JOIN iteci.modalidades AS m ON gru.idModalidad = m.idModalidad\n" + //
+                "JOIN iteci.`alumnos-modalidades` AS alm ON alm.idAlumno = al.idAlumnos\n" + //
+                "LEFT JOIN iteci.listaasistencia AS la ON la.idGrupoAlumno = ga.idGrupoAlumnos\n" + //
+                "WHERE al.idAlumnos = :idAlumno\n" + //
+                "GROUP BY\n" + //
+                "    ga.idGrupoAlumnos,\n" + //
+                "    al.idAlumnos,\n" + //
+                "    al.nombre,\n" + //
+                "    al.apellidoPaterno,\n" + //
+                "    al.apellidoMaterno,\n" + //
+                "    al.telefono,\n" + //
+                "    ga.idGrupo,\n" + //
+                "    gru.diaSemana,\n" + //
+                "    gru.horaInicio,\n" + //
+                "    gru.horaFin,\n" + //
+                "    m.nombre,\n" + //
+                "    alm.colegiatura;", 
+    nativeQuery = true)
     @QueryHints({
         @QueryHint(name = "org.hibernate.cacheable", value = "false"),
     })
