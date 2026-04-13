@@ -204,7 +204,7 @@ public class StudentController {
             // SUCCESS CASE
             // ------------------------------
             if (updatedRows == 1) {
-                gcsStorageService.uploadPdf(Files.readAllBytes(pdf.toPath()), dto.folio() + ".pdf");
+                //gcsStorageService.uploadPdf(Files.readAllBytes(pdf.toPath()), dto.folio() + ".pdf");
                 return ResponseEntity.ok("Pago completado correctamente");
             }
 
@@ -231,7 +231,7 @@ public class StudentController {
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }catch (Exception e) {
+        } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }

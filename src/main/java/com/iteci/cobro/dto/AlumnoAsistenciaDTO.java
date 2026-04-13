@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.sql.Time;
 import java.time.LocalDate;
 
+import lombok.extern.slf4j.Slf4j;
+
+
+@Slf4j
 public record AlumnoAsistenciaDTO(
         Long idAlumno,
         String nombre,
@@ -65,15 +69,18 @@ public record AlumnoAsistenciaDTO(
     }
 
     private static String toObserv(int totalSemanasPendientes, int numeroSemanaAdelantadas) {
-        
+        log.info("Calculating observaciones with totalSemanasPendientes {} and numeroSemanaAdelantadas {}", totalSemanasPendientes, numeroSemanaAdelantadas);
         if (totalSemanasPendientes < 0 && numeroSemanaAdelantadas==0) {
-            return "1 semana adelantada de pago";
+            log.info("1 semana adelantada de pago");
+            return "Muy bien vas al corriente con tus pagos :)";
             
         } else if (totalSemanasPendientes < 0 && numeroSemanaAdelantadas>0) {
+            log.info("{} semanas adelantadas de pago", numeroSemanaAdelantadas+1);
             return numeroSemanaAdelantadas+1+" semanas adelantadas de pago";
             
         } else {
-            return totalSemanasPendientes + " semanas pendientes de pago.";
+                log.info("{} semanas pendientes de pago", totalSemanasPendientes);
+                return totalSemanasPendientes + " semanas pendientes de pago.";
         }
     }
 
